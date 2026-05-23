@@ -1,0 +1,12 @@
+{
+  "name": "latex-editor",
+  "version": "1.0.0",
+  "scripts": {
+    "predev": "npx kill-port 47200 47201 --silent 2>nul || true",
+    "dev": "concurrently --kill-others-on-fail \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
