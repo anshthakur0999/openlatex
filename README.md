@@ -57,7 +57,7 @@ sudo apt install texlive-full
 ### 2. Clone and install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/openlatex.git
+git clone https://github.com/anshthakur0999/openlatex.git
 cd openlatex
 npm run install:all
 ```
@@ -146,7 +146,7 @@ openlatex/
 Pull requests are welcome! To get started:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/openlatex.git
+git clone https://github.com/anshthakur0999/openlatex.git
 cd openlatex
 npm run install:all
 npm run dev
