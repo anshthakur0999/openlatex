@@ -1,33 +1,69 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import { StreamLanguage } from '@codemirror/language';
 import { stex } from '@codemirror/legacy-modes/mode/stex';
-import { oneDark } from '@codemirror/theme-one-dark';
 
+// All colours reference CSS variables → auto-switch with OS theme.
 const latexTheme = EditorView.theme({
-  '&': { height: '100%', fontSize: '14px' },
+  '&': {
+    height: '100%',
+    background: 'var(--editor-bg)',
+  },
   '.cm-scroller': {
     overflow: 'auto',
-    fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace',
-    lineHeight: '1.6',
+    fontFamily: '"JetBrains Mono", "Cascadia Code", "Consolas", monospace',
+    lineHeight: '1.7',
+    background: 'var(--editor-bg)',
   },
-  '.cm-content':  { padding: '12px 0' },
-  '.cm-line':     { padding: '0 16px' },
-  '.cm-gutters':  { background: '#21252b', border: 'none', color: '#5c6370' },
-  '.cm-activeLineGutter': { background: '#2c313a' },
-  '.cm-activeLine':       { background: '#2c313a55' },
-  '.cm-cursor':           { borderLeftColor: '#528bff' },
-  '.cm-selectionBackground, ::selection': { background: '#3e4451 !important' },
+  '.cm-content': {
+    padding: '28px 0',
+    caretColor: 'var(--primary)',
+    color: 'var(--on-surface)',
+  },
+  '.cm-line': { padding: '0 24px' },
+  '.cm-gutters': {
+    background: 'var(--editor-bg)',
+    border: 'none',
+    color: 'var(--line-num)',
+    borderRight: '1px solid var(--border)',
+  },
+  '.cm-lineNumbers .cm-gutterElement': {
+    paddingRight: '14px',
+    minWidth: '48px',
+    textAlign: 'right',
+    fontFamily: '"JetBrains Mono", monospace',
+    fontSize: '12px',
+  },
+  '.cm-activeLineGutter': { background: 'transparent', color: 'var(--primary)', opacity: '0.7' },
+  '.cm-activeLine':       { background: 'var(--active-line)' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--primary)', borderLeftWidth: '2px' },
+  '.cm-selectionBackground':           { background: 'rgba(66,65,188,0.12) !important' },
+  '&.cm-focused .cm-selectionBackground': { background: 'rgba(66,65,188,0.18) !important' },
+  '.cm-matchingBracket': { background: 'rgba(66,65,188,0.10)', outline: 'none' },
+  // Syntax tokens
+  '.cm-keyword': { color: 'var(--syn-cmd)'     },
+  '.cm-atom':    { color: 'var(--syn-arg)'     },
+  '.cm-comment': { color: 'var(--syn-comment)', fontStyle: 'italic' },
+  '.cm-string':  { color: 'var(--syn-math)'    },
+  '.cm-tag':     { color: 'var(--syn-cmd)'     },
+  '.cm-builtin': { color: 'var(--syn-cmd)'     },
+  '.cm-meta':    { color: 'var(--syn-comment)' },
+  // Thin scrollbar
+  '.cm-scroller::-webkit-scrollbar':       { width: '4px', height: '4px' },
+  '.cm-scroller::-webkit-scrollbar-track': { background: 'transparent' },
+  '.cm-scroller::-webkit-scrollbar-thumb': { background: 'var(--scrollbar)', borderRadius: '2px' },
 });
 
-const Editor = forwardRef(function Editor({ value, onChange }, ref) {
-  const containerRef = useRef(null);
-  const viewRef      = useRef(null);
-  const onChangeRef  = useRef(onChange);
+const Editor = forwardRef(function Editor({ value, onChange, fontSize = 14, lineWrap = true }, ref) {
+  const containerRef    = useRef(null);
+  const viewRef         = useRef(null);
+  const onChangeRef     = useRef(onChange);
+  const wrapCompartment = useRef(new Compartment());
+
   onChangeRef.current = onChange;
 
-  // Expose scrollToLine so the outline panel can jump the editor
+  // scrollToLine exposed to parent (outline jump)
   useImperativeHandle(ref, () => ({
     scrollToLine(lineNumber) {
       const view = viewRef.current;
@@ -39,36 +75,33 @@ const Editor = forwardRef(function Editor({ value, onChange }, ref) {
           effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
         });
         view.focus();
-      } catch { /* line out of range — ignore */ }
+      } catch { /* line out of range */ }
     },
   }));
 
   // Mount once
   useEffect(() => {
     if (!containerRef.current) return;
-
     const view = new EditorView({
       state: EditorState.create({
         doc: value,
         extensions: [
           basicSetup,
           StreamLanguage.define(stex),
-          oneDark,
           latexTheme,
+          wrapCompartment.current.of(lineWrap ? EditorView.lineWrapping : []),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) onChangeRef.current(update.state.doc.toString());
           }),
-          EditorView.lineWrapping,
         ],
       }),
       parent: containerRef.current,
     });
-
     viewRef.current = view;
     return () => view.destroy();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync value set from outside (e.g. file load) without remounting
+  // Sync external value changes without remounting
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
@@ -78,7 +111,23 @@ const Editor = forwardRef(function Editor({ value, onChange }, ref) {
     }
   }, [value]);
 
-  return <div ref={containerRef} className="cm-container" />;
+  // Live-update line wrap via compartment (no remount)
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: wrapCompartment.current.reconfigure(lineWrap ? EditorView.lineWrapping : []),
+    });
+  }, [lineWrap]);
+
+  // Font size via inline style on the container — cleanest, no remount
+  return (
+    <div
+      ref={containerRef}
+      className="cm-container"
+      style={{ fontSize: fontSize + 'px' }}
+    />
+  );
 });
 
 export default Editor;

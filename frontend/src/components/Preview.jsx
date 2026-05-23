@@ -5,16 +5,16 @@ export default function Preview({ url, compiling }) {
         <div className="placeholder-icon">📄</div>
         <p className="placeholder-title">PDF preview</p>
         <p className="placeholder-body">
-          Start typing — the PDF compiles automatically after 1.5 s of inactivity.
+          Start typing — compiles automatically after 1.5s.
           <br />
-          Or press <kbd>Compile</kbd> to compile now.
+          Or press <kbd>Ctrl+S</kbd> to compile now.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="preview-wrapper">
+    <div className="preview-inner">
       {compiling && <div className="compile-overlay">Compiling…</div>}
       {url && (
         <iframe

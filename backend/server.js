@@ -20,19 +20,24 @@ if (!existsSync(WORK_DIR)) mkdirSync(WORK_DIR, { recursive: true });
 const TEX_FILE = join(WORK_DIR, 'document.tex');
 const PDF_FILE = join(WORK_DIR, 'document.pdf');
 
-// Find pdflatex — checks PATH and common MiKTeX install locations on Windows
+// Find pdflatex — checks common MiKTeX install locations on Windows, then falls back to PATH
 function findPdflatex() {
   const candidates = [
-    'pdflatex',
+    // Per-user MiKTeX (most common on Windows 10/11)
+    join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'MiKTeX', 'miktex', 'bin', 'x64', 'pdflatex.exe'),
+    join(process.env.LOCALAPPDATA  || '', 'Programs', 'MiKTeX', 'miktex', 'bin', 'x64', 'pdflatex.exe'),
+    // System-wide MiKTeX
     'C:\\Program Files\\MiKTeX\\miktex\\bin\\x64\\pdflatex.exe',
     'C:\\Program Files (x86)\\MiKTeX\\miktex\\bin\\pdflatex.exe',
-    join(process.env.LOCALAPPDATA || '', 'Programs', 'MiKTeX', 'miktex', 'bin', 'x64', 'pdflatex.exe'),
-    join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'MiKTeX', 'miktex', 'bin', 'x64', 'pdflatex.exe'),
+    // TeX Live (Linux / macOS / Windows)
+    '/usr/bin/pdflatex',
+    '/usr/local/bin/pdflatex',
+    '/Library/TeX/texbin/pdflatex',
   ];
   for (const c of candidates) {
-    if (c === 'pdflatex' || existsSync(c)) return c;
+    if (existsSync(c)) return c;   // full path confirmed on disk — use it
   }
-  return 'pdflatex'; // fallback — will fail with a clear error if not on PATH
+  return 'pdflatex'; // last resort: rely on PATH (works if shell profile updated)
 }
 
 const PDFLATEX = findPdflatex();

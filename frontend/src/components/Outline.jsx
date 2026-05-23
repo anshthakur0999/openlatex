@@ -1,8 +1,6 @@
-// Parses \chapter, \section, \subsection, \subsubsection from LaTeX source
-// and renders a clickable document outline panel.
+import { useState } from 'react';
 
 const LEVEL = { chapter: 0, section: 1, subsection: 2, subsubsection: 3 };
-const LABEL = { chapter: 'CH', section: '§', subsection: '§§', subsubsection: '§§§' };
 const SECTION_RE = /^\\(chapter|section|subsection|subsubsection)\*?\s*\{([^}]*)\}/;
 
 export function parseOutline(content) {
@@ -10,34 +8,60 @@ export function parseOutline(content) {
     .split('\n')
     .map((line, i) => {
       const m = line.match(SECTION_RE);
-      return m ? { type: m[1], title: m[2].trim(), line: i + 1, level: LEVEL[m[1]] ?? 1 } : null;
+      return m
+        ? { type: m[1], title: m[2].trim(), line: i + 1, level: LEVEL[m[1]] ?? 1 }
+        : null;
     })
     .filter(Boolean);
 }
 
-export default function Outline({ items, onJump }) {
+export default function Outline({ items, onJump, onClose, sidebarExpanded }) {
+  const [filter, setFilter] = useState('');
+  const [activeIdx, setActiveIdx] = useState(null);
+
   if (!items || items.length === 0) return null;
 
+  const filtered = filter
+    ? items.filter(item => item.title.toLowerCase().includes(filter.toLowerCase()))
+    : items;
+
+  const handleClick = (item, i) => {
+    setActiveIdx(i);
+    onJump(item.line);
+  };
+
   return (
-    <div className="outline-panel">
-      <div className="outline-header">
-        <span className="outline-title">Document Outline</span>
-        <span className="outline-count">{items.length} section{items.length !== 1 ? 's' : ''}</span>
+    <div className={`outline-popover${sidebarExpanded ? ' sidebar-expanded' : ''}`}>
+      <div className="outline-popover-header">
+        <span className="outline-popover-title">Outline</span>
+        <button className="outline-popover-close" onClick={onClose} title="Close">
+          <span className="icon icon-sm">close</span>
+        </button>
       </div>
-      <ul className="outline-list">
-        {items.map((item, i) => (
-          <li
+
+      <div className="outline-popover-list">
+        {filtered.map((item, i) => (
+          <button
             key={i}
-            className={`outline-item outline-level-${item.level}`}
-            onClick={() => onJump(item.line)}
+            className={`outline-popover-item level-${item.level}${activeIdx === i ? ' is-active' : ''}`}
+            onClick={() => handleClick(item, i)}
             title={`Line ${item.line}`}
           >
-            <span className="outline-badge">{LABEL[item.type]}</span>
-            <span className="outline-label">{item.title || '(untitled)'}</span>
-            <span className="outline-line">:{item.line}</span>
-          </li>
+            <span className="outline-item-num">{i + 1}</span>
+            <span className="outline-item-title">{item.title || '(untitled)'}</span>
+          </button>
         ))}
-      </ul>
+      </div>
+
+      <div className="outline-popover-search">
+        <span className="icon icon-sm">search</span>
+        <input
+          type="text"
+          placeholder="Filter sections..."
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+        />
+      </div>
     </div>
   );
 }
